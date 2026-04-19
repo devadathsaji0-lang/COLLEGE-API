@@ -3,68 +3,57 @@ const mongoose = require('mongoose');
 const cors = require('cors');
 
 const app = express();
+const PORT = process.env.PORT || 10000;
+
+// Middleware
 app.use(cors());
 app.use(express.json());
 
-// ===== 1. ഇവിടെ നിന്റെ MongoDB Connection String മാറ്റണം =====
-// MongoDB Atlas -> Database -> Connect -> Drivers -> Connection string copy ചെയ്യ്
-// <password> മാറ്റി നിന്റെ യഥാർത്ഥ password ഇടണം
-// അവസാനം /collegeDB ചേർക്കണം
-const MONGO_URI = 'mongodb+srv://devadath:yourRealPassword@cluster0.xxxxx.mongodb.net/collegeDB?retryWrites=true&w=majority';
+// MongoDB Connection
+const MONGO_URI = process.env.MONGO_URI;
 
 mongoose.connect(MONGO_URI)
   .then(() => console.log('MongoDB connected'))
   .catch(err => console.log('MongoDB Error:', err));
 
-// ===== Schema =====
-const DataSchema = new mongoose.Schema({
-  students: Array,
-  courses: Array,
-  faculty: Array,
-  attendance: Array,
-  todos: Array
+// Attendance Schema
+const attendanceSchema = new mongoose.Schema({
+  name: String,
+  status: String,
+  date: String,
+  timestamp: { type: Date, default: Date.now }
 });
 
-const DataModel = mongoose.model('Data', DataSchema);
+const Attendance = mongoose.model('Attendance', attendanceSchema);
 
-// ===== API Routes =====
+// Routes
+app.get('/', (req, res) => {
+  res.send('COLLEGE API is Live 🎉');
+});
 
-// GET - എല്ലാ data-യും കിട്ടാൻ
-app.get('/api/data', async (req, res) => {
+// Save attendance
+app.post('/attendance', async (req, res) => {
   try {
-    let data = await DataModel.findOne();
-    if (!data) {
-      data = new DataModel({ students: [], courses: [], faculty: [], attendance: [], todos: [] });
-      await data.save();
-    }
-    res.json(data);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
+    const { name, status, date } = req.body;
+    const newAttendance = new Attendance({ name, status, date });
+    await newAttendance.save();
+    res.status(201).json({ message: 'Attendance saved', data: newAttendance });
+  } catch (error) {
+    res.status(500).json({ message: 'Error saving attendance', error });
   }
 });
 
-// POST - എല്ലാ data-യും save/update ചെയ്യാൻ
-app.post('/api/data', async (req, res) => {
+// Get all attendance
+app.get('/attendance', async (req, res) => {
   try {
-    let data = await DataModel.findOne();
-    if (!data) {
-      data = new DataModel(req.body);
-    } else {
-      data.students = req.body.students || [];
-      data.courses = req.body.courses || [];
-      data.faculty = req.body.faculty || [];
-      data.attendance = req.body.attendance || [];
-      data.todos = req.body.todos || [];
-    }
-    await data.save();
-    res.json({ message: 'Data saved successfully', data });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
+    const data = await Attendance.find().sort({ timestamp: -1 });
+    res.status(200).json(data);
+  } catch (error) {
+    res.status(500).json({ message: 'Error fetching attendance', error });
   }
 });
 
-// ===== 2. ഇത് Render-ന് വേണ്ടി നിർബന്ധമാണ് =====
-const PORT = process.env.PORT || 3000;
+// Start server
 app.listen(PORT, () => {
-  console.log('Server running on port ' + PORT);
+  console.log(`Server running on port ${PORT}`);
 });
